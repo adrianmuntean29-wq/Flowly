@@ -3,7 +3,9 @@ import { withAuth } from '@/lib/auth/middleware';
 import { prisma } from '@/lib/db/prisma';
 import Anthropic from '@anthropic-ai/sdk';
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+function getClient() {
+  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+}
 
 export async function POST(request: NextRequest) {
   const auth = await withAuth(request);
@@ -50,7 +52,7 @@ For each idea, return a JSON object with:
 
 Return ONLY a valid JSON array with exactly ${count} objects, no other text.`;
 
-    const message = await client.messages.create({
+    const message = await getClient().messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 2000,
       system: systemPrompt,

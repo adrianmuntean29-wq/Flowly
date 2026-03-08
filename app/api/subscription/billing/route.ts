@@ -3,9 +3,11 @@ import { withAuth } from '@/lib/auth/middleware';
 import { prisma } from '@/lib/db/prisma';
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2025-02-24.acacia',
-});
+function getStripe() {
+  return new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+    apiVersion: '2025-02-24.acacia',
+  });
+}
 
 // GET - Get user's billing info
 export async function GET(request: NextRequest) {
@@ -64,7 +66,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Cancel Stripe subscription
-    await stripe.subscriptions.cancel(user.stripeSubscriptionId);
+    await getStripe().subscriptions.cancel(user.stripeSubscriptionId);
 
     // Update user in DB
     await prisma.user.update({

@@ -3,7 +3,9 @@ import { withAuth } from '@/lib/auth/middleware';
 import { prisma } from '@/lib/db/prisma';
 import Anthropic from '@anthropic-ai/sdk';
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+function getClient() {
+  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+}
 
 export async function POST(request: NextRequest) {
   const auth = await withAuth(request);
@@ -65,7 +67,7 @@ For each day, create ${postsPerDay} post(s). Return ONLY a valid JSON array wher
 Make each day have a different theme/angle. Total: ${7 * postsPerDay} items.
 Return ONLY the JSON array, no other text.`;
 
-    const message = await client.messages.create({
+    const message = await getClient().messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 4000,
       system: systemPrompt,

@@ -5,7 +5,9 @@ import { prisma } from '@/lib/db/prisma';
 import OpenAI from 'openai';
 import { canGeneratePostType, getRequiredPlanForPostType, type SubscriptionPlan, type PostType as PlanPostType } from '@/lib/features/permissions';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+function getOpenAIClient() {
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+}
 
 export async function POST(request: NextRequest) {
   // Check authentication
@@ -107,7 +109,7 @@ export async function POST(request: NextRequest) {
         imagePrompt = slidePrompts[0];
 
         const imagePromises = slidePrompts.map((slidePrompt) =>
-          openai.images.generate({
+          getOpenAIClient().images.generate({
             model: 'dall-e-3',
             prompt: slidePrompt,
             n: 1,
@@ -132,7 +134,7 @@ export async function POST(request: NextRequest) {
 
         try {
           const dalleSize = postType === 'REEL' || postType === 'VIDEO' ? '1024x1792' : '1024x1024';
-          const imageResponse = await openai.images.generate({
+          const imageResponse = await getOpenAIClient().images.generate({
             model: 'dall-e-3',
             prompt: imagePrompt,
             n: 1,

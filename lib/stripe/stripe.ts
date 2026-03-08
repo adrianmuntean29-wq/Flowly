@@ -1,8 +1,10 @@
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2025-02-24.acacia',
-});
+function getStripe() {
+  return new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+    apiVersion: '2025-02-24.acacia',
+  });
+}
 
 export const SUBSCRIPTION_PRICES = {
   FREE: {
@@ -27,7 +29,7 @@ export const SUBSCRIPTION_PRICES = {
 
 export async function createOrGetStripeCustomer(email: string, userId: string) {
   // In production, check if customer exists
-  const customers = await stripe.customers.list({
+  const customers = await getStripe().customers.list({
     email,
     limit: 1,
   });
@@ -37,7 +39,7 @@ export async function createOrGetStripeCustomer(email: string, userId: string) {
   }
 
   // Create new customer
-  const customer = await stripe.customers.create({
+  const customer = await getStripe().customers.create({
     email,
     metadata: {
       userId,
@@ -61,7 +63,7 @@ export async function createCheckoutSession(
 
   const customerId = await createOrGetStripeCustomer(email, userId);
 
-  const session = await stripe.checkout.sessions.create({
+  const session = await getStripe().checkout.sessions.create({
     customer: customerId,
     mode: 'subscription',
     payment_method_types: ['card'],
@@ -83,12 +85,12 @@ export async function createCheckoutSession(
 }
 
 export async function cancelSubscription(subscriptionId: string) {
-  const subscription = await stripe.subscriptions.cancel(subscriptionId);
+  const subscription = await getStripe().subscriptions.cancel(subscriptionId);
   return subscription;
 }
 
 export async function getSubscriptionStatus(subscriptionId: string) {
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  const subscription = await getStripe().subscriptions.retrieve(subscriptionId);
   return subscription;
 }
 
@@ -144,7 +146,7 @@ export function verifyWebhookSignature(
   secret: string
 ) {
   try {
-    return stripe.webhooks.constructEvent(body, signature, secret);
+    return getStripe().webhooks.constructEvent(body, signature, secret);
   } catch (error) {
     throw error;
   }
