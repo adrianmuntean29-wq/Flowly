@@ -15,7 +15,8 @@
       "Read(//c/Users/Andreea/flowly/app/**)",
       "Bash(xargs:*)",
       "Bash(node -e:*)",
-      "Bash(npx prisma validate:*)"
+      "Bash(npx prisma validate:*)",
+      "Bash(npx prisma db execute:*)"
     ]
   }
 }
