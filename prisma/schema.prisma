@@ -1,0 +1,406 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  passwordHash      String
+  firstName         String?
+  lastName          String?
+  avatar            String?
+  language          String    @default("en")
+
+  // Subscription
+  subscriptionPlan  SubscriptionPlan @default(FREE)
+  subscriptionStart DateTime?
+  subscriptionEnd   DateTime?
+  stripeCustomerId  String?   @unique
+  stripeSubscriptionId String?
+
+  // Usage Tracking (Flowly 2.0) - COMMENTED OUT until migration
+  // postsUsed         Int?      @default(0)
+  // imagesGenerated   Int?      @default(0)
+  // lastResetAt       DateTime? @default(now())
+
+  // Preferences (Flowly 2.0) - COMMENTED OUT until migration
+  // preferences       Json?     @default("{}")  // { theme: "light", defaultPlatforms: [] }
+
+  // Brand Kit
+  brandName         String?
+  brandColors       Json?     // { primary, secondary, accent }
+  brandFonts        Json?     // { heading, body }
+  brandLogo         String?   // S3 URL
+  brandVisualStyle  String?   // "minimalist", "bold", "vintage", "modern", etc.
+
+  // Brand Memory (AI context)
+  onboardingCompleted Boolean  @default(false)
+  brandTone          String?   // "professional", "casual", "playful", etc.
+  brandIndustry      String?   // "tech", "fashion", "food", etc.
+  brandKeywords      String[]  // key topics/hashtags
+  brandVoiceExample  String?   // example of brand's writing style
+
+  // Relations
+  posts             Post[]
+  assets            Asset[]
+  carousels         Carousel[]
+  templates         Template[]
+  socialAccounts    SocialAccount[]
+  userApiKeys       UserApiKey[]
+  apiLogs           ApiLog[]
+  payments          Payment[]
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([email])
+  @@index([subscriptionPlan])
+}
+
+// ============================================================================
+// ASSETS (Images) - Flowly 2.0
+// ============================================================================
+
+model Asset {
+  id                String              @id @default(cuid())
+  userId            String
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Asset Type
+  type              AssetType           @default(IMAGE)
+
+  // File Info
+  url               String              // S3/R2 URL
+  thumbnailUrl      String?             // Optimized thumbnail
+  width             Int
+  height            Int
+  fileSize          Int                 // bytes
+  format            String              @default("png") // png, jpg, webp
+
+  // Generation Metadata (if AI-generated)
+  generatedBy       GenerationSource?
+  prompt            String?             @db.Text
+  style             String?
+  aspectRatio       String?
+
+  // Editor State (if edited)
+  editorState       Json?               // Fabric.js canvas state
+  isEdited          Boolean             @default(false)
+
+  // Organization
+  tags              String[]            @default([])
+  folder            String?
+  isFavorite        Boolean             @default(false)
+
+  // Usage
+  usedInPosts       Post[]
+  usedInCarousels   CarouselSlide[]
+
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([userId, type])
+  @@index([userId, createdAt])
+  @@index([generatedBy])
+}
+
+// ============================================================================
+// CAROUSELS - Flowly 2.0
+// ============================================================================
+
+model Carousel {
+  id                String              @id @default(cuid())
+  userId            String
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Carousel Info
+  name              String
+  description       String?             @db.Text
+
+  // Generation Metadata
+  prompt            String?             @db.Text
+  theme             String?
+  generatedBy       String?             @default("CLAUDE")
+
+  // Slides
+  slides            CarouselSlide[]
+  slideCount        Int                 @default(0)
+
+  // Organization
+  tags              String[]            @default([])
+  isFavorite        Boolean             @default(false)
+
+  // Usage
+  usedInPosts       Post[]
+
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([userId, createdAt])
+}
+
+model CarouselSlide {
+  id                String              @id @default(cuid())
+  carouselId        String
+  carousel          Carousel            @relation(fields: [carouselId], references: [id], onDelete: Cascade)
+
+  // Slide Position
+  order             Int                 // 0, 1, 2, 3...
+
+  // Content
+  heading           String?
+  subheading        String?
+  bodyText          String?             @db.Text
+
+  // Visual Design
+  backgroundAssetId String?
+  backgroundAsset   Asset?              @relation(fields: [backgroundAssetId], references: [id], onDelete: SetNull)
+  backgroundColor   String?             @default("#ffffff")
+  backgroundType    BackgroundType      @default(COLOR)
+
+  // Editor State (for custom designs)
+  editorState       Json?               // Fabric.js canvas state
+
+  // Rendered Output
+  renderedUrl       String?             // Final rendered slide image
+
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@unique([carouselId, order])
+  @@index([carouselId])
+}
+
+model Post {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Post Type
+  type              PostType
+
+  // Caption (Flowly 2.0 - structured)
+  caption           String    @db.Text
+  hook              String?
+  body              String?   @db.Text
+  cta               String?
+  hashtags          String[]  @default([])
+
+  // Caption Metadata
+  captionMetadata   Json?     // { tone, platform, style }
+
+  // Media (Flowly 2.0 - references)
+  assetId           String?
+  asset             Asset?    @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  carouselId        String?
+  carousel          Carousel? @relation(fields: [carouselId], references: [id], onDelete: SetNull)
+
+  // Social Media
+  platforms         Platform[] @default([])
+  status            PostStatus @default(DRAFT)
+  scheduledFor      DateTime?
+  publishedAt       DateTime?
+
+  // Analytics
+  views             Int       @default(0)
+  likes             Int       @default(0)
+  comments          Int       @default(0)
+  shares            Int       @default(0)
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([userId, status])
+  @@index([userId, scheduledFor])
+  @@index([status, scheduledFor])
+}
+
+model Template {
+  id                String              @id @default(cuid())
+
+  // Template Info
+  name              String
+  description       String?             @db.Text
+  thumbnailUrl      String?             // Made optional for migration
+
+  // Template Type
+  type              TemplateType?       // Made optional for migration
+  category          String?             // "Marketing", "Education", "Quotes", etc.
+
+  // Design Data (Flowly 2.0)
+  editorState       Json?               // Made optional for migration
+  previewUrl        String?
+
+  // Ownership
+  isSystem          Boolean             @default(true)  // System template or user-created
+  userId            String?
+  user              User?               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Usage Stats
+  usageCount        Int                 @default(0)
+
+  // Tags
+  tags              String[]            @default([])
+  isPremium         Boolean             @default(false) // Pro-only templates
+
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([type, category])
+  @@index([isSystem, isPremium])
+  @@index([userId])
+}
+
+model SocialAccount {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  platform          String    // "instagram", "facebook", "tiktok", "linkedin"
+  accountId         String
+  accessToken       String
+  refreshToken      String?
+  username          String
+  
+  isConnected       Boolean   @default(true)
+  
+  connectedAt       DateTime  @default(now())
+  expiresAt         DateTime?
+
+  @@unique([userId, platform, accountId])
+  @@index([userId])
+}
+
+// ============================================================================
+// USER API KEYS — users bring their own AI API keys
+// Keys are encrypted with AES-256-GCM before storage
+// ============================================================================
+
+model UserApiKey {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Provider identifier
+  provider      String    // "anthropic" | "openai" | "gemini" | "groq" | "stability" | "replicate"
+  label         String    // User-defined name: "My Claude Key", "Work OpenAI"
+
+  // Encrypted key (AES-256-GCM, same logic as social tokens)
+  encryptedKey  String
+
+  // State
+  isActive      Boolean   @default(true)
+  isValid       Boolean?  // null = not yet validated, true = valid, false = invalid
+  lastUsed      DateTime?
+  usageCount    Int       @default(0)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([userId, provider, label])
+  @@index([userId, isActive])
+  @@index([userId, provider])
+}
+
+model ApiLog {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  endpoint          String
+  method            String
+  status            Int
+  duration          Int       // milliseconds
+  
+  createdAt         DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model Payment {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  stripePaymentId   String    @unique
+  amount            Int       // in cents
+  currency          String    @default("usd")
+  status            PaymentStatus @default(PENDING)
+  plan              SubscriptionPlan
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum SubscriptionPlan {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+enum PostType {
+  IMAGE           // Single image post
+  CAROUSEL        // Multi-slide carousel
+  VIDEO           // User-uploaded video (no AI video in Flowly 2.0)
+}
+
+enum PostStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  FAILED
+}
+
+enum AssetType {
+  IMAGE           // Single image
+  VIDEO           // User-uploaded video
+  THUMBNAIL       // Auto-generated thumbnail
+}
+
+enum GenerationSource {
+  STABILITY_AI
+  REPLICATE
+  DALLE
+  USER_UPLOAD
+}
+
+enum BackgroundType {
+  COLOR
+  GRADIENT
+  IMAGE
+  PATTERN
+}
+
+enum Platform {
+  INSTAGRAM
+  FACEBOOK
+  TIKTOK
+  LINKEDIN
+  TWITTER
+}
+
+enum TemplateType {
+  IMAGE           // Single image template
+  CAROUSEL_SLIDE  // Carousel slide template
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
