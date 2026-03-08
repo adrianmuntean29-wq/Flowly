@@ -6,9 +6,9 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { CAROUSEL_TEXT_GENERATION_PROMPT } from './prompts/caption';
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY!,
-});
+function getClient() {
+  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+}
 
 export interface CarouselSlideStructure {
   slideNumber: number;
@@ -60,7 +60,7 @@ export async function generateCarouselContent(
 
   try {
     // Call Claude
-    const message = await anthropic.messages.create({
+    const message = await getClient().messages.create({
       model: 'claude-sonnet-4-5-20250929',
       max_tokens: 2048,
       temperature: 0.7,
@@ -137,7 +137,7 @@ Output ONLY a JSON object:
   "imagePrompt": "Description for background image"
 }`;
 
-  const message = await anthropic.messages.create({
+  const message = await getClient().messages.create({
     model: 'claude-sonnet-4-5-20250929',
     max_tokens: 512,
     temperature: 0.8,

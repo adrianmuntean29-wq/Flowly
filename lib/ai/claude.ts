@@ -10,9 +10,11 @@ import {
   buildBrandVisualContext,
 } from './prompts';
 
-const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+// Lazy getter — client is created at runtime, not at module evaluation time.
+// This prevents build-time errors when ANTHROPIC_API_KEY is not available.
+function getClient() {
+  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VALIDATION LAYER
@@ -79,7 +81,7 @@ Keep the content concise, engaging, and suitable for social media.
 Use relevant hashtags and emojis when appropriate.
 If a voice example was provided, strictly match that writing style.`;
 
-  const message = await client.messages.create({
+  const message = await getClient().messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: request.maxTokens || 1000,
     system: systemPrompt,
@@ -119,7 +121,7 @@ export async function generateImagePrompt(request: ImageGenerationRequest): Prom
   }
 
   // ── EXPAND mode: Claude creates a DALL-E 3 prompt with strict rules ───────
-  const message = await client.messages.create({
+  const message = await getClient().messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 400,
     system: buildExpandSystemPrompt(request.postType, brandContext),
@@ -177,7 +179,7 @@ export async function generateCarouselSlidePrompts(
   // Step 1: Generate visual spine (shared aesthetic for all slides)
   let visualSpine = '';
   try {
-    const spineMsg = await client.messages.create({
+    const spineMsg = await getClient().messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 80,
       messages: [{
@@ -194,7 +196,7 @@ export async function generateCarouselSlidePrompts(
   // Step 2: Generate N slide descriptions (logical story progression)
   let slideDescriptions: string[] = [];
   try {
-    const descMsg = await client.messages.create({
+    const descMsg = await getClient().messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 60 * n,
       messages: [{
